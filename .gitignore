@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+env/
+.venv/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Storage (generated at runtime)
+backend/storage/encrypted/
+backend/storage/decrypted/
+backend/storage/leaked/
+recipient-agent/keystore/
+
+# DLT ledger data (generated at runtime)
+dlt/node1/ledger.db
+dlt/node2/ledger.db
+dlt/node3/ledger.db
+
+# Test artifacts
+validation-corpus/recipient-copies/
+validation-corpus/transformed-leaks/
+
+# Logs
+*.log

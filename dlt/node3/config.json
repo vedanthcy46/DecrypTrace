@@ -1,0 +1,7 @@
+{
+  "node3": {
+    "node_id": "node3",
+    "port": 8003,
+    "description": "DLT Node 3 (Organization C)"
+  }
+}
