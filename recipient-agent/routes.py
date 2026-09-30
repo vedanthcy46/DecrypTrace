@@ -251,8 +251,17 @@ async def decrypt_document(req: DecryptRequest):
         traceback.print_exc()
         raise HTTPException(500, f"Watermark/signing step failed: {e}")
 
-    # 7. Return plaintext + signed evidence
-    decrypted_b64 = base64.b64encode(plaintext).decode()
+    # 7. Embed watermark into document
+    try:
+        from watermark import embed_watermark_in_pdf
+        logger.info(f"Injecting DCT watermark {req.watermark_id} into document...")
+        watermarked_pdf = embed_watermark_in_pdf(plaintext, req.watermark_id)
+        decrypted_b64 = base64.b64encode(watermarked_pdf).decode()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Watermark injection failed, returning raw plaintext: {e}")
+        decrypted_b64 = base64.b64encode(plaintext).decode()
 
     logger.info(
         f"Decryption complete for {req.callsign}: "

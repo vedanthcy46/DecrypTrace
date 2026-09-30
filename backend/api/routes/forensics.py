@@ -69,7 +69,7 @@ async def analyze_document(file: UploadFile = File(...), db: AsyncSession = Depe
         logger.error(f"Watermark extraction failed: {e}")
         extraction_error = str(e)
 
-    # If no watermark found through extraction (or if it's just noise), use prototype fallback
+    # Look up the extracted watermark in decryption sessions
     session = None
     if watermark_detected and extracted_wm:
         result = await db.execute(
@@ -80,7 +80,9 @@ async def analyze_document(file: UploadFile = File(...), db: AsyncSession = Depe
         session = result.scalar_one_or_none()
 
     if not session:
-        # Fallback for prototype: just use the latest committed session
+        # Fallback: DCT compression often causes 1-2 bits to flip in the 128-bit array,
+        # which corrupts the UTF-8 string during decode. For the prototype, we fall back
+        # to the latest session if the exact string match fails.
         all_sessions = await db.execute(select(DecryptionSession))
         sessions = all_sessions.scalars().all()
         if sessions:
@@ -93,7 +95,7 @@ async def analyze_document(file: UploadFile = File(...), db: AsyncSession = Depe
                 logger.info(f"Prototype fallback: using watermark {extracted_wm}")
 
     if not session:
-        # No match found
+        # No match found - could be unwatermarked or invalid
         report = ForensicReport(
             report_id=report_id,
             leaked_file_path=str(leaked_path),

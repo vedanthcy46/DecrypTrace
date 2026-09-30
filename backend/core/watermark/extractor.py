@@ -77,45 +77,56 @@ def extract_watermark_from_pdf(pdf_path: str) -> ExtractionResult:
     try:
         from blind_watermark import WaterMark
 
+        extracted_any = False
         for page_num in range(min(doc.page_count, 5)):  # Check first 5 pages
             page = doc[page_num]
-            # Render page as image
-            pix = page.get_pixmap(dpi=150)
-            img_data = pix.tobytes("png")
+            image_list = page.get_images(full=True)
+            
+            if not image_list:
+                continue
+                
+            for img_index, img in enumerate(image_list):
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                img_bytes = base_image["image"]
+                
+                # Save to temp file for blind_watermark
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                    tmp.write(img_bytes)
+                    tmp_path = tmp.name
 
-            # Save to temp file for blind_watermark
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                tmp.write(img_data)
-                tmp_path = tmp.name
+                try:
+                    # Attempt extraction
+                    bwm = WaterMark(password_img=1, password_wm=1)
+                    # Extract watermark - expecting 128 bits
+                    wm_extract = bwm.extract(tmp_path, wm_shape=128, mode="bit")
 
-            try:
-                # Attempt extraction
-                bwm = WaterMark(password_img=1, password_wm=1)
-                # Extract watermark - expecting 128 bits
-                wm_extract = bwm.extract(tmp_path, wm_shape=128, mode="bit")
+                    if wm_extract is not None and len(wm_extract) > 0:
+                        # Convert bits to bytes
+                        wm_bits = np.array(wm_extract[:128], dtype=np.uint8)
+                        wm_bytes = np.packbits(wm_bits)
+                        
+                        # Extract the first 8 bytes (which are the ascii string)
+                        wm_str = wm_bytes.tobytes()[:8].decode('utf-8', errors='ignore').strip('\x00')
+                        watermark_id = f"WM-{wm_str}"
 
-                if wm_extract is not None and len(wm_extract) > 0:
-                    # Convert bits to hex string
-                    wm_bits = np.array(wm_extract[:128], dtype=np.uint8)
-                    wm_bytes = np.packbits(wm_bits)
-                    wm_hex = wm_bytes.tobytes().hex().upper()
-                    watermark_id = f"WM-{wm_hex[:8]}"
+                        logger.info(
+                            f"Watermark extracted from page {page_num}: {watermark_id}"
+                        )
 
-                    logger.info(
-                        f"Watermark extracted from page {page_num}: {watermark_id}"
-                    )
-
-                    return ExtractionResult(
-                        watermark_detected=True,
-                        watermark_id=watermark_id,
-                        integrity_valid=True,  # Simplified for prototype
-                        confidence=0.95,
-                        page_extracted_from=page_num,
-                    )
-            except Exception as e:
-                logger.debug(f"Extraction failed on page {page_num}: {e}")
-            finally:
-                os.unlink(tmp_path)
+                        return ExtractionResult(
+                            watermark_detected=True,
+                            watermark_id=watermark_id,
+                            integrity_valid=True,  # Simplified for prototype
+                            confidence=0.95,
+                            page_extracted_from=page_num,
+                        )
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    logger.debug(f"Extraction failed on page {page_num}: {e}")
+                finally:
+                    os.unlink(tmp_path)
 
     except ImportError:
         logger.warning("blind_watermark not available, using fallback extraction")
