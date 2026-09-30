@@ -49,3 +49,6 @@ validation-corpus/transformed-leaks/
 
 # Logs
 *.log
+
+# Databases
+*.db
